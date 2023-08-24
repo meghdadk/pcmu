@@ -19,6 +19,7 @@ class PCMU:
         # Get all the gradients and their average according to Eq.(20)
         model.train()
         gradients = []  # Accumulate gradients for all batches
+        avg_gradients = None
         
         for inputs, targets in tqdm(data_loader):
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
@@ -28,8 +29,12 @@ class PCMU:
             loss.backward()
             
             batch_gradients = torch.cat([param.grad.view(-1) for param in model.parameters()])
+            if avg_gradients == None:
+                avg_gradients = batch_gradients
+            else:
+                avg_gradients = self.compute_gradient_average([avg_gradients, batch_gradients])
 
-            gradients.append(batch_gradients)
+            #gradients.append(batch_gradients)
             
             if regular_training:
                 optimizer.step()
@@ -37,7 +42,7 @@ class PCMU:
         if scheduler is not None:
             scheduler.step()
 
-        return gradients
+        return avg_gradients
 
     def compute_gradient_average(self, gradients):
         stacked_tensors = torch.stack(gradients)
@@ -116,11 +121,11 @@ for epoch in range(num_epochs):
     # Train for one epoch
     print ("*"*20, f"epoch {epoch}", "*"*20)
     print ("==> Calculate gradients ...")
-    gradients = pcmu.train_one_epoch(model, optimizer, scheduler, criterion, trainloader, regular_training=True)
+    avg_gradients = pcmu.train_one_epoch(model, optimizer, scheduler, criterion, trainloader, regular_training=True)
     
     # Calculate the average gradients over the dataset (all the batches)
     print ("==> Average gradients out ...")
-    avg_gradients = pcmu.compute_gradient_average(gradients)
+    #avg_gradients = pcmu.compute_gradient_average(gradients)
     
     # Apply quantization and smoothing to the average gradients
     print ("==> Quantize gradients ...")
