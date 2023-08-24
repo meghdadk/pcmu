@@ -32,7 +32,8 @@ class PCMU:
             if regular_training:
                 optimizer.step()
         
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
 
         return gradients
 
@@ -74,7 +75,7 @@ class PCMU:
 # Example usage
 learning_rate = 0.05
 sigma = 0.1
-num_epochs = 26
+num_epochs = 50
 
 # Load CIFAR-10 dataset
 
@@ -91,14 +92,18 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=500, shuffle=True
 valloader = torch.utils.data.DataLoader(valset, batch_size=500, shuffle=False, num_workers=2)
 testloader = torch.utils.data.DataLoader(testset, batch_size=500, shuffle=False, num_workers=2)
 
-# Create ResNet-18 model
+# Create ResNet-18 model and initialize it with Kaiming
+def kaiming_init(m):
+    if isinstance(m, (nn.Conv2d, nn.Linear)):
+        nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
 model = resnet18(pretrained=False, num_classes=10)
+model.apply(kaiming_init)
 
 
 criterion = nn.CrossEntropyLoss()
 pcmu = PCMU(model, criterion, learning_rate, sigma)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+scheduler = None#optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
 
 # Training loop
