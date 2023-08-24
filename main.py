@@ -7,6 +7,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torchvision.models import resnet18, alexnet
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class PCMU:
     def __init__(self, model, loss_fn, learning_rate, sigma):
@@ -20,6 +21,7 @@ class PCMU:
         gradients = []  # Accumulate gradients for all batches
         
         for inputs, targets in tqdm(data_loader):
+            inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -60,7 +62,7 @@ class PCMU:
 
     def randomized_gradient_smoothing(self, quantized_gradients):
         # Simulated smoothing function based on Eq.(21)
-        noise = torch.normal(mean=0, std=self.sigma, size=quantized_gradients.size())
+        noise = torch.normal(mean=0, std=self.sigma, size=quantized_gradients.size()).to(DEVICE)
         smoothed_gradients = torch.argmax(quantized_gradients + noise, dim=-1)
         return smoothed_gradients
 
@@ -98,16 +100,16 @@ def kaiming_init(m):
         nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
 model = resnet18(pretrained=False, num_classes=10)
 model.apply(kaiming_init)
-
+model = model.to(DEVICE)
 
 criterion = nn.CrossEntropyLoss()
+criterion = criterion.to(DEVICE)
 pcmu = PCMU(model, criterion, learning_rate, sigma)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = None#optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
 
 # Training loop
-
 for epoch in range(num_epochs):
     # Train for one epoch
     print ("*"*20, f"epoch {epoch}", "*"*20)
@@ -138,8 +140,9 @@ for epoch in range(num_epochs):
     train_total = 0
     with torch.no_grad():
         for data in trainloader:
-            images, labels = data
-            outputs = model(images)
+            inputs, labels = data
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
             train_total += labels.size(0)
             train_correct += (predicted == labels).sum().item()
@@ -151,8 +154,9 @@ for epoch in range(num_epochs):
     val_total = 0
     with torch.no_grad():
         for data in valloader:
-            images, labels = data
-            outputs = model(images)
+            inputs, labels = data
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            outputs = model(inputs)
             _, predicted = torch.max(outputs.data, 1)
             val_total += labels.size(0)
             val_correct += (predicted == labels).sum().item()
@@ -166,8 +170,9 @@ test_correct = 0
 test_total = 0
 with torch.no_grad():
     for data in testloader:
-        images, labels = data
-        outputs = model(images)
+        inputs, labels = data
+        inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+        outputs = model(inputs)
         _, predicted = torch.max(outputs.data, 1)
         test_total += labels.size(0)
         test_correct += (predicted == labels).sum().item()
