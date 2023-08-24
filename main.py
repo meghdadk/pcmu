@@ -77,7 +77,7 @@ class PCMU:
 # Example usage
 learning_rate = 0.05
 sigma = 0.1
-num_epochs = 50
+num_epochs = 120
 
 # Load CIFAR-10 dataset
 
@@ -132,6 +132,15 @@ for epoch in range(num_epochs):
     # Update the model parameters using the smoothed gradients
     print ("==> Updating parameters ...")
     pcmu.update_parameters(model, smoothed_gradients)
+
+    if epoch == int(num_epochs/2):
+        pcmu.learning_rate = pcmu.learning_rate / 10
+        for g in optimizer.param_groups:
+            g['lr'] = g['lr'] / 10
+    elif epoch == int(num_epochs*3/4):
+        pcmu.learning_rate = pcmu.learning_rate / 10
+        for g in optimizer.param_groups:
+            g['lr'] = g['lr'] / 10
 
 
     # Train set evaluation
