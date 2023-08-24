@@ -40,9 +40,10 @@ class PCMU:
         return gradients
 
     def compute_gradient_average(self, gradients):
-        flattened_gradients = torch.cat([grad.view(-1) for grad in gradients])
-        avg_gradient = flattened_gradients.mean(dim=0)
-        return avg_gradient
+        stacked_tensors = torch.stack(gradients)
+        avg_gradients = torch.mean(stacked_tensors, dim=0)
+        
+        return avg_gradients
 
     def quantization_function(self, gradients):
         # Simulated quantization function based on Eq.(6)
@@ -78,6 +79,7 @@ class PCMU:
 learning_rate = 0.05
 sigma = 0.1
 num_epochs = 120
+batch_size = 128
 
 # Load CIFAR-10 dataset
 
@@ -90,9 +92,9 @@ train_size = int(0.8 * len(trainset))
 val_size = len(trainset) - train_size
 trainset, valset = torch.utils.data.random_split(trainset, [train_size, val_size])
 
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=500, shuffle=True, num_workers=2)
-valloader = torch.utils.data.DataLoader(valset, batch_size=500, shuffle=False, num_workers=2)
-testloader = torch.utils.data.DataLoader(testset, batch_size=500, shuffle=False, num_workers=2)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
+valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=2)
+testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
 # Create ResNet-18 model and initialize it with Kaiming
 def kaiming_init(m):
@@ -118,8 +120,7 @@ for epoch in range(num_epochs):
     
     # Calculate the average gradients over the dataset (all the batches)
     print ("==> Average gradients out ...")
-    stacked_tensors = torch.stack(gradients)
-    avg_gradients = torch.mean(stacked_tensors, dim=0)
+    avg_gradients = pcmu.compute_gradient_average(gradients)
     
     # Apply quantization and smoothing to the average gradients
     print ("==> Quantize gradients ...")
