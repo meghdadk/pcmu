@@ -12,7 +12,7 @@ import datasets
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class PCMU:
-    def __init__(self, model, loss_fn, learning_rate, sigma):
+    def __init__(self, loss_fn, learning_rate, sigma):
         self.loss_fn = loss_fn
         self.sigma = sigma
         self.learning_rate = learning_rate
@@ -82,16 +82,15 @@ class PCMU:
             param.data -= self.learning_rate * smoothed_gradients[start:end].reshape(param.shape)
             start = end
 
-# Example usage
+# Hyperparameters according to the (supplimantary material) of the paper
 learning_rate = 0.05
 sigma = 0.1
 num_epochs = 120
-batch_size = 128
+batch_size = 500
 
-#Load the loaders
-trainloader, valloader, testloader = datasets.get_loaders('svhn', '../image_data/', 500) 
+trainloader, valloader, testloader = datasets.get_loaders('svhn', '../image_data/', batch_size) 
 
-# Create ResNet-18 model and initialize it with Kaiming
+# Kaiming initialization according to the paper
 def kaiming_init(m):
     if isinstance(m, (nn.Conv2d, nn.Linear)):
         nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
@@ -101,8 +100,8 @@ model = model.to(DEVICE)
 
 criterion = nn.CrossEntropyLoss()
 criterion = criterion.to(DEVICE)
-pcmu = PCMU(model, criterion, learning_rate, sigma)
-optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+pcmu = PCMU(criterion, learning_rate, sigma)
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = None#optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
 
@@ -110,11 +109,11 @@ scheduler = None#optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epoch
 for epoch in range(num_epochs):
     # Train for one epoch
     print ("*"*20, f"epoch {epoch}", "*"*20)
-    print ("==> Calculate gradients ...")
+    print ("==> Calculate gradients and their averages ...")
     avg_gradients = pcmu.train_one_epoch(model, optimizer, scheduler, criterion, trainloader, regular_training=True)
     
     # Calculate the average gradients over the dataset (all the batches)
-    print ("==> Average gradients out ...")
+    #print ("==> Average gradients out ...")
     #avg_gradients = pcmu.compute_gradient_average(gradients)
     
     # Apply quantization and smoothing to the average gradients
@@ -139,7 +138,7 @@ for epoch in range(num_epochs):
             g['lr'] = g['lr'] / 10
 
 
-    # Train set evaluation
+    # Train accuracy
     model.eval()
     train_correct = 0
     train_total = 0
@@ -153,7 +152,7 @@ for epoch in range(num_epochs):
             train_correct += (predicted == labels).sum().item()
     train_accuracy = 100 * train_correct / train_total
 
-    # Validation set evaluation
+    # validation accuracy
     model.eval()
     val_correct = 0
     val_total = 0
@@ -169,7 +168,7 @@ for epoch in range(num_epochs):
 
     print('Train accuracy: {:.2f}%'.format(train_accuracy), '\tValidation accuracy: {:.2f}%'.format(val_accuracy))
 
-# Final test set evaluation
+# Test set accuracy
 model.eval()
 test_correct = 0
 test_total = 0
